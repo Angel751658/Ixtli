@@ -19,7 +19,7 @@ resource "aws_iam_role" "ixtli_role" {
 }
 
 # Politica que le permita a EC2:
-# -> crear, guardar y consultar buckets en S3
+# -> guardar y consultar buckets en S3
 # -> consultar un modelo ML en Sagemaker
 # -> manejo de rekognition (detectar texto en imagenes)
 # -> manejo de translate (traducir texto)
@@ -27,7 +27,7 @@ resource "aws_iam_role_policy" "ixtli_policy" {
   name = "ixtli-policy"
   role = aws_iam_role.ixtli_role.name
 
-  policy = jsondecode({
+  policy = jsonencode({
     Version = "2012-10-17"
 
     Statement = [
@@ -76,4 +76,10 @@ resource "aws_iam_role_policy" "ixtli_policy" {
 resource "aws_iam_instance_profile" "ixtli_profile" {
   name = "ixtli-profile"
   role = aws_iam_role.ixtli_role.name
+}
+
+# Mensaje de confirmacion
+output "mensaje_iam_creado" {
+  description = "Mensaje de confirmacion del rol iam"
+  value = "El rol IAM ${aws_iam_role.ixtli_role.id} ha sido creado!"
 }

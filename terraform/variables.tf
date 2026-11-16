@@ -17,3 +17,15 @@ variable "environment" {
   type        = string
   default     = "dev"
 }
+
+variable "admin_cidr" {
+  description = "Local IP"
+  type        = string
+  default     =  "187.189.36.60/32"
+}
+
+variable "ec2_key_name" {
+  description = "EC2 key pair"
+  type        = string
+  default     = "ixtli-key-pair"
+}
