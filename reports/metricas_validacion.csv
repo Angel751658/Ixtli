@@ -1,0 +1,5 @@
+Modelo,Conjunto,Exactitud,F1 macro
+Naive Bayes,Validación limpia,0.8589166666666667,0.8587749853034584
+Naive Bayes,Validación con ruido,0.8461666666666666,0.8458881029866934
+Regresión logística,Validación limpia,0.8674166666666666,0.8673131837847853
+Regresión logística,Validación con ruido,0.854,0.8538293335756281

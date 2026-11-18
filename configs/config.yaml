@@ -1,0 +1,50 @@
+project:
+  name: traductor-imagenes
+  seed: 42
+
+# Idiomas del nucleo: nombre, codigo de Translate/Rekognition (ISO 639-1), etiqueta WiLI (ISO 639-3)
+# y alias con los que pueden venir etiquetados los datos (se ignoran mayusculas y acentos).
+languages:
+  default_target: es
+  core:
+    - {name: espanol,   translate: es, wili: spa, aliases: [spanish, castellano]}
+    - {name: ingles,    translate: en, wili: eng, aliases: [english]}
+    - {name: portugues, translate: pt, wili: por, aliases: [portuguese]}
+    - {name: frances,   translate: fr, wili: fra, aliases: [french, francais]}
+    - {name: italiano,  translate: it, wili: ita, aliases: [italian]}
+    - {name: aleman,    translate: de, wili: deu, aliases: [german, deutsch]}
+
+aws:
+  region: us-east-1        # se sobrescribe con AWS_REGION
+  s3_bucket: ""            # se sobrescribe con S3_BUCKET
+  rekognition:
+    min_confidence: 80     # descarta lineas detectadas con menor confianza
+  translate:
+    source_auto: auto      # autodeteccion cuando el clasificador no esta seguro
+
+data:
+  # Fuente del dataset:
+  #   local       -> archivos descargados de Kaggle en `local_dir` (wili_6idiomas_*.csv o x_*/y_*.txt)
+  #   huggingface -> se descarga automaticamente de Hugging Face
+  source: local
+  local_dir: data           # relativa a la raiz del proyecto (o ruta absoluta)
+  local_format: auto        # auto (CSV si existe, si no TXT) | csv | txt
+  hf_dataset: MartinThoma/wili_2018
+  raw_dir: data/raw
+  processed_dir: data/processed
+  test_photos_dir: data/test_photos
+  val_fraction: 0.2        # se separa por parrafo ANTES de fragmentar
+  fragment:
+    min_words: 1
+    max_words: 5
+    per_paragraph: 20
+  noise:
+    char_error_rate: 0.05
+    uppercase_prob: 0.3
+
+model:
+  candidates: [naive_bayes, logreg]
+  analyzer: char_wb
+  ngram_range: [1, 4]
+  unknown_threshold: 0.6   # por debajo => "otro/desconocido" y Translate autodetecta
+  artifact_path: models/language_clf.joblib

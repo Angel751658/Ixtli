@@ -1,0 +1,13 @@
+{
+  "modelo": "logreg",
+  "resultados": {
+    "Prueba limpia": {
+      "exactitud": 0.8708,
+      "f1_macro": 0.8708
+    },
+    "Prueba con ruido": {
+      "exactitud": 0.8575,
+      "f1_macro": 0.8575
+    }
+  }
+}

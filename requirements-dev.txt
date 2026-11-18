@@ -1,0 +1,10 @@
+-r requirements.txt
+# Entrenamiento y analisis
+pandas>=2.1
+datasets>=2.18
+matplotlib>=3.8
+jupyter>=1.0
+# Calidad y pruebas
+pytest>=8.0
+httpx>=0.27
+ruff>=0.4
