@@ -43,7 +43,8 @@ resource "aws_iam_role_policy" "ixtli_policy" {
             Effect = "Allow"
             Action = [
                 "s3:PutObject",
-                "s3:GetObject"
+                "s3:GetObject",
+                "s3:DeleteObject"
             ]
             Resource = "${aws_s3_bucket.ixtli_images.arn}/*"
         },

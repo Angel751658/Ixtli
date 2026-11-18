@@ -6,7 +6,7 @@ resource "aws_s3_bucket" "ixtli_images" {
   # Tags del proyecto
   tags = local.common_tags
 }
-
+ 
 # Acceso publico al bucket
 resource "aws_s3_bucket_public_access_block" "ixtli_images" {
   bucket = aws_s3_bucket.ixtli_images.id

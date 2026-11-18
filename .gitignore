@@ -1,3 +1,6 @@
 **/.terraform/
+
 *.tfvars
 *.tfvars.json
+
+.venv/
