@@ -1,4 +1,5 @@
 import boto3
+import json
 
 from botocore.exceptions import ClientError
 from fastapi import FastAPI, UploadFile, File, HTTPException
@@ -13,10 +14,11 @@ app = FastAPI(
 )
 
 # Variables de AWS
-BUCKET_NAME = "ixtli-images"
 AWS_REGION = "us-east-1"
+BUCKET_NAME = "ixtli-images"
+SAGEMAKER_ENDPOINT = "ixtli-model-endpoint"
 
-# Cliente de S3 (con boto3)
+# Cliente de S3
 s3 = boto3.client(
     "s3",
     region_name=AWS_REGION
@@ -25,6 +27,12 @@ s3 = boto3.client(
 # Cliente de Rekognition
 rekognition = boto3.client(
     "rekognition",
+    region_name=AWS_REGION
+)
+
+# Cliente de SageMaker
+sagemaker = boto3.client(
+    "sagemaker-runtime",
     region_name=AWS_REGION
 )
 
@@ -193,7 +201,7 @@ async def process_image(image_id: str):
                     detail="Imagen no encontrada"
                 )
     
-            raise HTTPException(
+            raise HTTPException (
                 status_code=500,
                 detail="No fue posible detectar texto en la imagen"
             )
@@ -204,17 +212,44 @@ async def process_image(image_id: str):
     # Filtrar las detecciones de texto para que solo se muestren lineas completas en vez de palabras
     # -> esto se hace mas que nada para evitar repeticion de palabras
     image_detected_text = [
-        {
-            "texto": item["DetectedText"],
-            "confianza": item["Confidence"]
-        }
-        
+        item["DetectedText"]
         for item in text_detected
         if item["Type"] == "LINE"
     ]
+
+    # Diccionario para guardar el idioma de c/linea
+    text_language = []
+
+    for text in image_detected_text:
+        try:
+            # 2. Enviar cada linea detectada a SageMaker
+            prediction = sagemaker.invoke_endpoint(
+                EndpointName=SAGEMAKER_ENDPOINT,
+                ContentType="application/json",
+                Accept="application/json",
+                Body=json.dumps({"text": text}) # se manda el texto detectado como JSON (formato aceptado por SageMaker)
+            )
+
+            # Leer la respuesta de SageMaker (JSON -> Python)
+            prediction_result = json.loads(
+                prediction["Body"].read().decode("utf-8")
+            )
+
+            # Guardar el idioma del texto
+            text_language.append({
+                "texto_original": text,
+                "idioma": prediction_result["language"],
+                "confianza": prediction_result["confidence"]
+            })
+
+        except ClientError as e:
+            raise HTTPException(
+                status_code=500,
+                detail="No fue posible clasificar el idioma del texto"
+            )      
     
     return {
         "mensaje": "Texto detectado",
         "image_id": image_id,
-        "texto_detectado": image_detected_text
+        "texto_detectado": text_language
     }
