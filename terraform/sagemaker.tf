@@ -66,7 +66,8 @@ resource "aws_sagemaker_model" "ixtli_language_classifier" {
   primary_container {
     image = data.aws_sagemaker_prebuilt_ecr_image.sklearn.registry_path
 
-    model_data_url = "s3://${aws_s3_bucket.ixtli_images.bucket}/sagemaker/model.tar.gz"
+    # Antes de integrar el modelo a SageMaker, subir el archivo a S3 (paso 6)
+    model_data_url = "s3://${aws_s3_object.sagemaker_model.bucket}/${aws_s3_object.sagemaker_model.key}"
 
     environment = {
       SAGEMAKER_PROGRAM = "inference.py"
@@ -111,4 +112,13 @@ resource "aws_sagemaker_endpoint" "ixtli_model_endpoint" {
 output "mensaje_endpoint_creado" {
   description = "Mensaje de confirmacion del endpoint del modelo"
   value = "El endpoint ${aws_sagemaker_endpoint.ixtli_model_endpoint.id} ha sido creado!"
+}
+
+# 6. Subir el modelo ML a S3
+resource "aws_s3_object" "sagemaker_model" {
+  bucket = aws_s3_bucket.ixtli_images.id
+  key    = "sagemaker/model.tar.gz" # ubicacion en S3
+
+  source = "${path.module}/../sagemaker/model.tar.gz" # ubicacion local
+  etag = filemd5("${path.module}/../sagemaker/model.tar.gz")
 }

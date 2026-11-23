@@ -66,7 +66,10 @@ resource "aws_iam_role_policy" "ixtli_policy" {
         # Translate
         {
             Effect = "Allow"
-            Action = ["translate:TranslateText"]
+            Action = [
+                "translate:TranslateText",
+                "comprehend:DetectDominantLanguage"
+            ]
             Resource = "*"
         }
     ]

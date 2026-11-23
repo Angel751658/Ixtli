@@ -2,6 +2,7 @@ import boto3
 import json
 
 from botocore.exceptions import ClientError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import StreamingResponse
 from uuid import uuid4
@@ -11,6 +12,20 @@ app = FastAPI(
     title="IXTLI API",
     description="API para el reconocimiento y traducción de texto en imágenes",
     version="1.0.0"
+)
+
+# Permitir peticiones de React y Vite (puerto 5173)
+allowed_origin = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origin,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
 )
 
 # Variables de AWS
@@ -33,6 +48,12 @@ rekognition = boto3.client(
 # Cliente de SageMaker
 sagemaker = boto3.client(
     "sagemaker-runtime",
+    region_name=AWS_REGION
+)
+
+# Cliente de Translate
+translate = boto3.client(
+    "translate",
     region_name=AWS_REGION
 )
 
@@ -135,6 +156,8 @@ async def get_image(image_id: str):
         media_type=image["ContentType"]
     )
 
+# GET: 
+
 # DELETE: eliminar una imagen del bucket
 @app.delete("/images/{image_id}")
 async def delete_image(image_id: str):
@@ -174,10 +197,57 @@ async def delete_image(image_id: str):
         "size_bytes": image.get("ContentLength")
     }
 
+# Funcion para traducir el texto con Translate (una vez pasado por Rekognition y SageMaker)
+def translate_text(text: str, source_language: str, target_language: str):
+    # Si el lenguaje inicial y el objetivo son iguales, no se hace nada
+    if source_language == target_language:
+        return text, source_language
+
+    try:
+        # Traducir el texto dado
+        response = translate.translate_text(
+            Text=text,
+            SourceLanguageCode=source_language,
+            TargetLanguageCode=target_language
+        )
+
+    except ClientError as e:
+        error = e.response["Error"]["Code"]
+
+        # Si Translate no cumple con ciertos niveles de confianza, no puede traducir de forma automatica,
+        # pero guarda el posible idioma detectado en 'DetectedLanguageCode'
+        if error == "DetectedLanguageLowConfidenceException":
+            detected_language = e.response.get("DetectedLanguageCode")
+
+            # Si el idioma detectado con baja confianza NO es el idioma al que queremos traducir,
+            # volvemos a intentar la traduccion
+            if detected_language and detected_language != target_language:
+                response = translate.translate_text(
+                    Text=text,
+                    SourceLanguageCode=detected_language,
+                    TargetLanguageCode=target_language
+                )
+
+            else:
+                # Regresa el lenguaje detectado si este es el mismo que el objetivo o es un valor vacio
+                return text, detected_language or "unknown"
+
+        # Si el idioma de origen y el objetivo son pares invalidos
+        elif error == "UnsupportedLanguagePairException":
+            return error, source_language, target_language
+
+        else:
+            raise
+
+    return (
+        response["TranslatedText"],
+        response["SourceLanguageCode"]
+    )
+
 # POST: completar el proceso de traduccion
 # s3 -> rekognition -> sagemaker -> translate
 @app.post("/images/{image_id}/process")
-async def process_image(image_id: str):
+async def process_image(image_id: str, target_language: str = "es"):
     # Crear una clave unica para c/imagen de S3
     image_key = f"images/{image_id}"
 
@@ -218,7 +288,7 @@ async def process_image(image_id: str):
     ]
 
     # Diccionario para guardar el idioma de c/linea
-    text_language = []
+    translated_text = []
 
     for text in image_detected_text:
         try:
@@ -235,21 +305,46 @@ async def process_image(image_id: str):
                 prediction["Body"].read().decode("utf-8")
             )
 
-            # Guardar el idioma del texto
-            text_language.append({
+            # Guardar el idioma original del texto (segun el modelo de SageMaker)
+            source_language = prediction_result["language"]
+            confidence = prediction_result["confidence"]
+
+            # Si SageMaker no identifica el idioma original (unknown), utiliza la funcion automatica de Translate
+            if source_language == "unknown":
+                translate_source = "auto"
+
+            else:
+                translate_source = source_language
+
+            # 3. Traducir el texto mediante Translate
+            final_text, detected_language = translate_text(
+                text,
+                translate_source,
+                target_language
+            )
+
+            # Guardar los resultados de la traduccion
+            translated_text.append({
                 "texto_original": text,
-                "idioma": prediction_result["language"],
-                "confianza": prediction_result["confidence"]
+                "idioma_original": detected_language,
+                "confianza": confidence,
+                "traducción": final_text
             })
 
         except ClientError as e:
+            print("ERROR DE AWS:")
+            print("Código:", e.response["Error"]["Code"])
+            print("Mensaje:", e.response["Error"]["Message"])
+            print("Respuesta completa:", e.response)
+
             raise HTTPException(
                 status_code=500,
-                detail="No fue posible clasificar el idioma del texto"
-            )      
+                detail="No fue posible clasificar o traducir el texto"
+            )    
     
     return {
-        "mensaje": "Texto detectado",
+        "mensaje": "Texto detectado, clasificado y traducido correctamente",
         "image_id": image_id,
-        "texto_detectado": text_language
+        "idioma_destino": target_language,
+        "traducción": translated_text
     }
