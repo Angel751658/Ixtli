@@ -1,11 +1,25 @@
-import boto3
 import json
-
-from botocore.exceptions import ClientError
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.responses import StreamingResponse
+import time
 from uuid import uuid4
+
+import boto3
+from botocore.exceptions import ClientError
+from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response, StreamingResponse
+from monitoring import (
+    HTTP_REQUEST_DURATION,
+    HTTP_REQUESTS,
+    MODEL_CONFIDENCE,
+    MODEL_INFERENCE_DURATION,
+    MODEL_PREDICTION_ERRORS,
+    MODEL_PREDICTIONS,
+    TRANSLATION_DURATION,
+    TRANSLATION_ERRORS,
+    TRANSLATIONS,
+    language_label,
+)
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 # Crear la API de Ixtli
 app = FastAPI(
@@ -13,6 +27,24 @@ app = FastAPI(
     description="API para el reconocimiento y traducción de texto en imágenes",
     version="1.0.0"
 )
+
+
+@app.middleware("http")
+async def record_http_metrics(request, call_next):
+    started_at = time.perf_counter()
+    status_code = 500
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+        return response
+    finally:
+        route = request.scope.get("route")
+        route_name = getattr(route, "path", "unmatched")
+        HTTP_REQUESTS.labels(request.method, route_name, str(status_code)).inc()
+        HTTP_REQUEST_DURATION.labels(request.method, route_name).observe(
+            time.perf_counter() - started_at
+        )
+
 
 # Permitir peticiones de React y Vite (puerto 5173)
 allowed_origin = [
@@ -65,6 +97,19 @@ def inicio():
         "estado": "Funcionando correctamente"
     }
 
+
+@app.get("/health", tags=["monitoreo"])
+def health():
+    """Comprueba que el proceso HTTP está disponible."""
+    return {"status": "ok"}
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics():
+    """Expone métricas de Prometheus para el recolector."""
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
 # POST: subir imagenes al bucket
 @app.post("/images")
 async def upload_image(file: UploadFile = File(...)):
@@ -110,7 +155,7 @@ async def upload_image(file: UploadFile = File(...)):
             ContentType=file.content_type
         )
 
-    except ClientError as e:
+    except ClientError:
         raise HTTPException(
             status_code=500,
             detail="No fue posible guardar la imagen en S3"
@@ -333,56 +378,80 @@ async def process_image(image_id: str, target_language: str = "es"):
     translated_text = []
 
     for text in image_detected_text:
+        inference_started_at = time.perf_counter()
         try:
             # 2. Enviar cada linea detectada a SageMaker
             prediction = sagemaker.invoke_endpoint(
                 EndpointName=SAGEMAKER_ENDPOINT,
                 ContentType="application/json",
                 Accept="application/json",
-                Body=json.dumps({"text": text}) # se manda el texto detectado como JSON (formato aceptado por SageMaker)
+                Body=json.dumps({"text": text}),     # se manda el texto detectado como JSON (formato aceptado por SageMaker)
             )
 
             # Leer la respuesta de SageMaker (JSON -> Python)
             prediction_result = json.loads(
                 prediction["Body"].read().decode("utf-8")
             )
+        except ClientError as e:
+            MODEL_PREDICTION_ERRORS.inc()
+            print("ERROR DE AWS:")
+            print("Código:", e.response["Error"]["Code"])
+            print("Mensaje:", e.response["Error"]["Message"])
+            print("Respuesta completa:", e.response)
+            raise HTTPException(
+                status_code=500,
+                detail="No fue posible clasificar o traducir el texto"
+            )
+        finally:
+            MODEL_INFERENCE_DURATION.observe(time.perf_counter() - inference_started_at)
 
-            # Guardar el idioma original del texto (segun el modelo de SageMaker)
-            source_language = prediction_result["language"]
-            confidence = prediction_result["confidence"]
+        # Guardar el idioma original del texto (segun el modelo de SageMaker)
+        source_language = str(prediction_result["language"])
+        confidence = float(prediction_result["confidence"])
+        prediction_language = language_label(source_language)
+        MODEL_PREDICTIONS.labels(prediction_language).inc()
+        MODEL_CONFIDENCE.labels(prediction_language).observe(confidence)
 
-            # Si SageMaker no identifica el idioma original (unknown), utiliza la funcion automatica de Translate
-            if source_language == "unknown":
-                translate_source = "auto"
-
-            else:
-                translate_source = source_language
-
+        # Si SageMaker no identifica el idioma original (unknown), utiliza la funcion automatica de Translate
+        translate_source = "auto" if source_language == "unknown" else source_language
+        source_label = language_label(translate_source)
+        target_label = language_label(target_language)
+        translation_started_at = time.perf_counter()
+        translation_result = "success"
+        try:
             # 3. Traducir el texto mediante Translate
             final_text, detected_language = translate_text(
                 text,
                 translate_source,
                 target_language
             )
-
-            # Guardar los resultados de la traduccion
-            translated_text.append({
-                "texto_original": text,
-                "idioma_original": detected_language,
-                "confianza": confidence,
-                "traducción": final_text
-            })
-
         except ClientError as e:
+            translation_result = "error"
+            TRANSLATION_ERRORS.labels(source_label, target_label).inc()
             print("ERROR DE AWS:")
             print("Código:", e.response["Error"]["Code"])
             print("Mensaje:", e.response["Error"]["Message"])
             print("Respuesta completa:", e.response)
-
             raise HTTPException(
                 status_code=500,
                 detail="No fue posible clasificar o traducir el texto"
-            )    
+            )
+        finally:
+            TRANSLATION_DURATION.labels(source_label, target_label).observe(
+                time.perf_counter() - translation_started_at
+            )
+
+        if translate_source == target_language:
+            translation_result = "skipped"
+        TRANSLATIONS.labels(source_label, target_label, translation_result).inc()
+
+        # Guardar los resultados de la traduccion
+        translated_text.append({
+            "texto_original": text,
+            "idioma_original": detected_language,
+            "confianza": confidence,
+            "traducción": final_text
+        })
     
     return {
         "mensaje": "Texto detectado, clasificado y traducido correctamente",

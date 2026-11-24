@@ -30,6 +30,7 @@ data:
   local_dir: data           # relativa a la raiz del proyecto (o ruta absoluta)
   local_format: auto        # auto (CSV si existe, si no TXT) | csv | txt
   hf_dataset: MartinThoma/wili_2018
+  hf_revision: 12c3a519f58673e4051a5d9db51c1fcd94a94c75  # commit inmutable para descargas reproducibles
   raw_dir: data/raw
   processed_dir: data/processed
   test_photos_dir: data/test_photos

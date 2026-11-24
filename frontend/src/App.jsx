@@ -13,7 +13,6 @@ import './App.css'
 
 function App() {
     const [isUploading, setIsUploading] = useState(false)
-    const [uploadedImage, setUploadedImage] = useState(null)
 
     const [galleryVersion, setGalleryVersion] = useState(0)
 
@@ -24,8 +23,7 @@ function App() {
         try {
             setIsUploading(true)
 
-            const result = await uploadImage(file)
-            setUploadedImage(result)
+            await uploadImage(file)
             setGalleryVersion(current => current + 1)
 
             alert('¡Imagen subida correctamente!')

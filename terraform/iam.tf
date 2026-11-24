@@ -6,14 +6,14 @@ resource "aws_iam_role" "ixtli_role" {
     Version = "2012-10-17"
 
     Statement = [
-        # EC2
-        {
-            Action = "sts:AssumeRole"
-            Effect = "Allow"
-            Principal = {
-                Service = "ec2.amazonaws.com"
-            }
+      # EC2
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
         }
+      }
     ]
   })
 }
@@ -31,47 +31,47 @@ resource "aws_iam_role_policy" "ixtli_policy" {
     Version = "2012-10-17"
 
     Statement = [
-        # S3: Bucket
-        {
-            Effect = "Allow"
-            Action = ["s3:ListBucket"]
-            Resource = aws_s3_bucket.ixtli_images.arn
-        },
-        
-        # S3: Objetos dentro del bucket
-        {
-            Effect = "Allow"
-            Action = [
-                "s3:PutObject",
-                "s3:GetObject",
-                "s3:DeleteObject"
-            ]
-            Resource = "${aws_s3_bucket.ixtli_images.arn}/*"
-        },
+      # S3: Bucket
+      {
+        Effect   = "Allow"
+        Action   = ["s3:ListBucket"]
+        Resource = aws_s3_bucket.ixtli_images.arn
+      },
 
-        # SageMaker IA
-        {
-            Effect = "Allow"
-            Action = ["sagemaker:InvokeEndpoint"]
-            Resource = "*"
-        },
+      # S3: Objetos dentro del bucket
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:PutObject",
+          "s3:GetObject",
+          "s3:DeleteObject"
+        ]
+        Resource = "${aws_s3_bucket.ixtli_images.arn}/*"
+      },
 
-        # Rekognition
-        {
-            Effect = "Allow"
-            Action = ["rekognition:DetectText"]
-            Resource = "*"
-        },
+      # SageMaker IA
+      {
+        Effect   = "Allow"
+        Action   = ["sagemaker:InvokeEndpoint"]
+        Resource = "*"
+      },
 
-        # Translate
-        {
-            Effect = "Allow"
-            Action = [
-                "translate:TranslateText",
-                "comprehend:DetectDominantLanguage"
-            ]
-            Resource = "*"
-        }
+      # Rekognition
+      {
+        Effect   = "Allow"
+        Action   = ["rekognition:DetectText"]
+        Resource = "*"
+      },
+
+      # Translate
+      {
+        Effect = "Allow"
+        Action = [
+          "translate:TranslateText",
+          "comprehend:DetectDominantLanguage"
+        ]
+        Resource = "*"
+      }
     ]
   })
 }
@@ -85,5 +85,5 @@ resource "aws_iam_instance_profile" "ixtli_profile" {
 # Mensaje de confirmacion
 output "mensaje_iam_creado" {
   description = "Mensaje de confirmacion del rol iam"
-  value = "El rol IAM ${aws_iam_role.ixtli_role.id} ha sido creado!"
+  value       = "El rol IAM ${aws_iam_role.ixtli_role.id} ha sido creado!"
 }

@@ -20,10 +20,9 @@ expuesto mediante una API REST.
 8. [Modelo de aprendizaje automático](#8-modelo-de-aprendizaje-automático)
 9. [Despliegue en AWS](#9-despliegue-en-aws)
 10. [Ejecución de la API](#10-ejecución-de-la-api)
-11. [Pruebas y calidad de código](#11-pruebas-y-calidad-de-código)
-12. [Limitaciones y consideraciones éticas](#12-limitaciones-y-consideraciones-éticas)
-13. [Seguridad y buenas prácticas](#13-seguridad-y-buenas-prácticas)
-14. [Créditos y licencias](#14-créditos-y-licencias)
+11. [Pruebas y CI/CD](#11-pruebas-y-cicd)
+12. [Monitoreo](#12-monitoreo)
+13. [Créditos y licencias](#13-créditos-y-licencias)
 
 ## 1. Problema
 
@@ -199,9 +198,38 @@ fastapi dev main.py
 
 La documentación interactiva queda disponible en `http://127.0.0.1:8000/docs`.
 
+## 11. Pruebas y CI/CD
 
+Ejecuta las pruebas y el análisis estático desde la raíz:
 
-## Créditos y licencias
+```bash
+python -m pytest -q
+ruff check api src scripts tests --select E,F,I,UP --line-length 110
+```
+
+GitHub Actions ejecuta Ruff, Bandit, pytest y las validaciones de formato y sintaxis de Terraform. Si pasan las
+pruebas, el build/lint del frontend y la validación de infraestructura, los pushes a `main` y las ejecuciones
+manuales publican `model.tar.gz` y el build estático del frontend como artefactos de GitHub Actions (retención de
+14 días). El artefacto del modelo puede descargarse para desplegarlo en SageMaker; el workflow no modifica recursos
+de AWS.
+
+## 12. Monitoreo
+
+La API expone dos rutas para monitoreo:
+
+- `GET /health`: confirma que el proceso HTTP está disponible; no invoca servicios de AWS.
+- `GET /metrics`: expone métricas en formato Prometheus. Configura Prometheus para recolectar esta ruta.
+
+Se registran solicitudes y latencia HTTP por ruta/estado, conteo y confianza de predicciones por idioma, duración de
+inferencias de SageMaker, conteo/latencia de traducciones y errores de SageMaker o Translate. Las etiquetas de idioma
+se limitan a un conjunto fijo para evitar cardinalidad no acotada; el texto de las imágenes no se incluye en las
+métricas.
+
+La confianza y la latencia permiten observar cambios operativos, pero no sustituyen una medición de exactitud. Para
+calcular calidad del modelo se requieren etiquetas reales; las métricas de evaluación etiquetada disponibles están en
+[`reports/metricas_prueba.json`](reports/metricas_prueba.json).
+
+## 13. Créditos y licencias
 
 - **Dataset:** WiLI-2018, publicado bajo la licencia *ODC Open Database License v1.0*.
   Thoma, M. (2018). *The WiLI benchmark dataset for written language identification*. arXiv:1801.07779.

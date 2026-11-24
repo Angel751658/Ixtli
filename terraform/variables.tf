@@ -21,7 +21,7 @@ variable "environment" {
 variable "admin_cidr" {
   description = "Local IP"
   type        = string
-  default     =  "187.189.36.60/32"
+  default     = "187.189.36.60/32"
 }
 
 variable "ec2_key_name" {

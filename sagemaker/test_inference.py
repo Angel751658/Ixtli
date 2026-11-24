@@ -1,45 +1,40 @@
-import sys
+import json
 from pathlib import Path
-from code.inference import model_fn, input_fn, predict_fn, output_fn
 
-# Obtener la ruta raíz del proyecto
+import pytest
+
+from sagemaker.code.inference import input_fn, model_fn, output_fn, predict_fn
+
 ROOT = Path(__file__).resolve().parent.parent
 
-# 1. Cargar el modelo
-MODEL_DIR = ROOT / "sagemaker" / "model"
-model = model_fn(str(MODEL_DIR))
 
-print("Modelo cargado correctamente.")
-print("Clases del modelo:", model.classes_)
+@pytest.fixture(scope="module")
+def model():
+    return model_fn(str(ROOT / "sagemaker" / "model"))
 
-# 2. Preparar textos de prueba
-texts = [
-    "Hola, ¿cómo estás?",
-    "Good morning, how are you?",
-    "Bonjour, comment allez-vous?",
-    "Guten Morgen, wie geht es dir?",
-    "Buongiorno, come stai?",
-    "Bom dia, como você está?"
-]
 
-# 3. Probar el proceso completo de inferencia
-for text in texts:
-    print("\nTexto original:", text)
+def test_sagemaker_inference_round_trip(model):
+    text = "Good morning, how are you doing today?"
+    request_body = json.dumps({"text": text})
 
-    # Simular la entrada JSON que recibe SageMaker
-    request_body = f'{{"text": "{text}"}}'
-
-    # Procesar la entrada
     processed_text = input_fn(request_body, "application/json")
-
-    # Realizar predicción
     prediction = predict_fn(processed_text, model)
+    response, content_type = output_fn(prediction, "application/json")
 
-    # Convertir la respuesta a JSON
-    response, content_type = output_fn(
-        prediction,
-        "application/json"
-    )
+    assert prediction["language"] == "en"
+    assert 0.6 <= prediction["confidence"] <= 1.0
+    assert json.loads(response) == prediction
+    assert content_type == "application/json"
 
-    print("Predicción:", response)
-    print("Content-Type:", content_type)
+
+@pytest.mark.parametrize(
+    ("body", "content_type"),
+    [
+        ('{"text": "hola"}', "text/plain"),
+        ('{"text": ""}', "application/json"),
+        ('{"value": "hola"}', "application/json"),
+    ],
+)
+def test_input_fn_rejects_invalid_requests(body, content_type):
+    with pytest.raises(ValueError):
+        input_fn(body, content_type)

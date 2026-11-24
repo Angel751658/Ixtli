@@ -132,7 +132,10 @@ def _load_hf(cfg: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Descarga WiLI-2018 de Hugging Face (requiere la libreria `datasets`)."""
     from datasets import load_dataset  # dependencia de desarrollo
 
-    ds = load_dataset(cfg["data"]["hf_dataset"])
+    ds = load_dataset(
+        cfg["data"]["hf_dataset"],
+        revision=cfg["data"]["hf_revision"],
+    )
     names = ds["train"].features["label"].names
     mapping = wili_to_code(cfg)
     missing = [w for w in mapping if w not in names]
