@@ -1,0 +1,52 @@
+.header {
+    width: 100%;
+    padding: 25px 5% 15px;
+    background-color: #faf9fc;
+    text-align: center;
+}
+
+.header-title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 35px;
+}
+
+.header-title h1 {
+    margin: 0;
+    color: #302078;
+    font-size: 76px;
+    font-weight: 800;
+    letter-spacing: 8px;
+}
+
+.header-line {
+    height: 4px;
+    flex: 1;
+    width: 100%;
+    background-color: #655b9a;
+}
+
+.header-subtitle {
+    margin: 0;
+    color: #655b9a;
+    font-size: 22px;
+}
+
+@media (max-width: 600px) {
+    .header {
+        padding: 25px 5%;
+    }
+
+    .header-title {
+        gap: 15px;
+    }
+
+    .header-title h1 {
+        font-size: 48px;
+    }
+
+    .header-subtitle {
+        font-size: 16px;
+    }
+}

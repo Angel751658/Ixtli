@@ -156,7 +156,49 @@ async def get_image(image_id: str):
         media_type=image["ContentType"]
     )
 
-# GET: 
+# GET: obtener todas las imagenes del bucket
+@app.get("/images")
+async def get_all_images():
+    try:
+        # Obtener 10 imagenes del bucket
+        last_images = s3.list_objects_v2(
+            Bucket=BUCKET_NAME,
+            Prefix="images/",
+            MaxKeys=5
+        )
+
+        # Lista para almacenar la info de las imagenes
+        images = []
+
+        for image in last_images.get("Contents", []):
+            # Obtener el id de c/imagen
+            image_key = image["Key"]
+            image_id = image_key.replace("images/", "", 1)
+
+            # Guardar la info de c/imagen
+            images.append({
+                "image_id": image_id,
+                "size_bytes": image["Size"],
+                "saved_date": image["LastModified"]
+            })
+
+        # Ordenar las imagenes de mas recientes a mas antiguas
+        images.sort(
+            key=lambda image: image["saved_date"],
+            reverse=True
+        )
+
+    except ClientError:
+        raise HTTPException(
+            status_code=500,
+            detail="No fue posible obtener las imagenes almacenadas en S3"
+        )
+
+    return {
+        "confirmacion": "Imagenes obtenidas correctamente",
+        "total": len(images),
+        "imagenes": images
+    }
 
 # DELETE: eliminar una imagen del bucket
 @app.delete("/images/{image_id}")
