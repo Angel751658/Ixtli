@@ -62,7 +62,7 @@ jobs:
         run: pip install -r requirements-dev.txt
 
       - name: Ejecutar pruebas
-        run: pytest -q
+        run: python -m pytest -q
 
   frontend:
     name: Frontend (ESLint + build)
@@ -136,9 +136,10 @@ jobs:
 
       - name: Validar estructura del paquete
         run: |
-          tar -tzf "$RUNNER_TEMP/model.tar.gz" | grep -Fxq './language_clf.joblib'
-          tar -tzf "$RUNNER_TEMP/model.tar.gz" | grep -Fxq './code/inference.py'
-          tar -tzf "$RUNNER_TEMP/model.tar.gz" | grep -Fxq './code/requirements.txt'
+          tar -tzf "$RUNNER_TEMP/model.tar.gz" > "$RUNNER_TEMP/model-contents.txt"
+          grep -Fxq './language_clf.joblib' "$RUNNER_TEMP/model-contents.txt"
+          grep -Fxq './code/inference.py' "$RUNNER_TEMP/model-contents.txt"
+          grep -Fxq './code/requirements.txt' "$RUNNER_TEMP/model-contents.txt"
 
       - name: Publicar artefacto
         uses: actions/upload-artifact@v4

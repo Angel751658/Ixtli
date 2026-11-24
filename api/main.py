@@ -350,15 +350,15 @@ async def process_image(image_id: str, target_language: str = "es"):
         )
 
     except ClientError as e:
-            error = e.response["Error"]["Code"]
-    
-            if error in ["NoSuchKey", "404", "NotFound"]:
-                raise HTTPException(
+        error = e.response["Error"]["Code"]
+
+        if error in ["NoSuchKey", "404", "NotFound"]:
+            raise HTTPException(
                     status_code=404,
                     detail="Imagen no encontrada"
                 )
-    
-            raise HTTPException (
+
+        raise HTTPException (
                 status_code=500,
                 detail="No fue posible detectar texto en la imagen"
             )
@@ -381,11 +381,12 @@ async def process_image(image_id: str, target_language: str = "es"):
         inference_started_at = time.perf_counter()
         try:
             # 2. Enviar cada linea detectada a SageMaker
+                # se manda el texto detectado como JSON (formato aceptado por SageMaker)
             prediction = sagemaker.invoke_endpoint(
                 EndpointName=SAGEMAKER_ENDPOINT,
                 ContentType="application/json",
                 Accept="application/json",
-                Body=json.dumps({"text": text}),     # se manda el texto detectado como JSON (formato aceptado por SageMaker)
+                Body=json.dumps({"text": text}),     
             )
 
             # Leer la respuesta de SageMaker (JSON -> Python)
@@ -452,7 +453,7 @@ async def process_image(image_id: str, target_language: str = "es"):
             "confianza": confidence,
             "traducción": final_text
         })
-    
+
     return {
         "mensaje": "Texto detectado, clasificado y traducido correctamente",
         "image_id": image_id,
