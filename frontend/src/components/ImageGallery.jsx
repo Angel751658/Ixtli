@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
-import { deleteImage, processImage, getImages } from '../services/api'
+import { API_URL, deleteImage, processImage, getImages } from '../services/api'
 import './ImageGallery.css'
-
-const API_URL = 'http://127.0.0.1:8000'
 
 function ImageGallery({ refreshTrigger, targetLanguage, onTranslationResult }) {
     const [images, setImages] = useState([])
